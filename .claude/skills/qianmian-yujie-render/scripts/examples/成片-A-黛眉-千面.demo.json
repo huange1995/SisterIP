@@ -1,0 +1,17 @@
+{
+  "title": "A-黛眉·千面",
+  "ratio": "9:16",
+  "fps": 24,
+  "scenes": [
+    {"id": "s1", "src": "images", "dir": "栏目图/护士装", "per": 2.5,
+     "cuts": "hard", "cam": "pan", "text": "值夜班，是她的主旋律"},
+    {"id": "s2", "src": "image", "base": "定妆照/A-黛眉/A-黛眉.png",
+     "dur": 4, "cam": "zoom-in", "text": "午夜，她最清醒"},
+    {"id": "s3", "src": "images", "dir": "栏目图/女仆装", "per": 4,
+     "cuts": "hard", "cam": "zoom-out", "text": "换一面，还是这张脸"}
+  ],
+  "audio": {
+    "bgm": "pad.mp3",
+    "bgm_volume": 0.35
+  }
+}

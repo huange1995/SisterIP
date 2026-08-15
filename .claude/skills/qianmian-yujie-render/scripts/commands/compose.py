@@ -287,9 +287,13 @@ def cmd_compose(args, cfg) -> int:
             tracks.append(track)
     if bgm:
         vol = audio_cfg.get("bgm_volume") if audio_cfg.get("bgm_volume") is not None else cfg.bgm_volume
+        # 淡出落在视频结尾（BGM 比成片长时 -shortest 才会在音乐末尾前收住，不硬切）
+        video_total = plan[-1]["start"] + plan[-1]["dur"] if plan else 0.0
+        fade_out_at = max(0.0, video_total - cfg.bgm_fade)
         tracks.append({"path": bgm, "delay": 0.0, "volume": vol,
-                       "fade_in": cfg.bgm_fade, "fade_out": cfg.bgm_fade})
-        print(f"    BGM → {bgm.name}（vol={vol}，淡入淡出 {cfg.bgm_fade}s）")
+                       "fade_in": cfg.bgm_fade, "fade_out": cfg.bgm_fade,
+                       "fade_out_at": fade_out_at})
+        print(f"    BGM → {bgm.name}（vol={vol}，淡入 {cfg.bgm_fade}s，淡出至 {fade_out_at:.1f}s）")
     mixed = audio_media.build_mix(cfg, tracks, clips_dir)
 
     final = run_dir / archive.compose_name(title)

@@ -108,9 +108,13 @@ def mix_tracks(tracks: list[dict], out: Path, *, normalize: bool = False) -> Pat
     """把多路音频轨按序混合为 .m4a（AAC 192k）。
 
     tracks 每项：{"path": Path|str, "delay": 秒(相对视频起点),
-                  "volume": 音量(1.0), "fade_in": 秒, "fade_out": 秒}
+                  "volume": 音量(1.0), "fade_in": 秒, "fade_out": 秒,
+                  "fade_out_at": 秒(可选，淡出开始时刻；缺省用该轨自身时长)}
     每路先统一立体声（aformat），再 adelay 对齐、volume 调音量、afade 淡入淡出，
     最后 amix 混合（默认 normalize=0，避免整体音量忽大忽小）。
+
+    BGM 场景：音乐比成片长时，fade_out_at 应传「视频结尾 - fade」，让淡出落在视频末尾
+    而不是音乐末尾（否则 -shortest 会在视频中途硬切音频）。
     """
     tracks = [dict(t) for t in tracks]
     if not tracks:
@@ -130,8 +134,10 @@ def mix_tracks(tracks: list[dict], out: Path, *, normalize: bool = False) -> Pat
         fin = float(t.get("fade_in", 0.0))
         fout = float(t.get("fade_out", 0.0))
         if fout > 0:
-            dur = probe_duration(t["path"])
-            st = max(0.0, dur - fout)
+            if t.get("fade_out_at") is not None:
+                st = max(0.0, float(t["fade_out_at"]))
+            else:
+                st = max(0.0, probe_duration(t["path"]) - fout)
             chain += f",afade=t=in:st=0:d={fin},afade=t=out:st={st:.3f}:d={fout}"
         elif fin > 0:
             chain += f",afade=t=in:st=0:d={fin}"
