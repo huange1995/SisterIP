@@ -107,3 +107,31 @@ class FaceValidator:
         if emb is None or base is None:
             return None
         return self.similarity(emb, base)
+
+    # ------------------------------------------------------------ 视频抽帧（图生视频「人不变」校验）
+    def extract_frame(self, video_path: Path, frac: float, out_path: Path) -> Path | None:
+        """按播放进度 frac(0~1) 抽一帧存到 out_path（视频「人不变」用）。
+
+        cv2.imwrite 对中文路径会失败，故用 imencode + numpy.tofile 落盘。
+        成功返回 out_path，失败返回 None。
+        """
+        import cv2
+
+        cap = cv2.VideoCapture(str(video_path))
+        if not cap.isOpened():
+            return None
+        try:
+            total = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+            idx = min(int(total * frac), max(int(total) - 1, 0))
+            cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+            ok, frame = cap.read()
+            if not ok:
+                return None
+            ok2, buf = cv2.imencode(".png", frame)
+            if not ok2:
+                return None
+            Path(out_path).parent.mkdir(parents=True, exist_ok=True)
+            buf.tofile(str(out_path))
+            return Path(out_path)
+        finally:
+            cap.release()

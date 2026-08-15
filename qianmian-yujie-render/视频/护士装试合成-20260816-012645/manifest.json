@@ -1,0 +1,12 @@
+{
+  "phase": "合成 montage（图集 → 视频）",
+  "images": [
+    "..\\..\\..\\qianmian-yujie-render\\栏目图\\护士装\\护士装-01.png",
+    "..\\..\\..\\qianmian-yujie-render\\栏目图\\护士装\\护士装-02.png"
+  ],
+  "tag": "护士装试合成",
+  "fps": 24,
+  "per_image_sec": 2.5,
+  "size": "1080x1920",
+  "created": "20260816-012647"
+}

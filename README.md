@@ -14,7 +14,8 @@
 - **五层配方库**：`形象锚点 × 服装 × 姿势 × 场景 × 质量` 都是独立积木，按黄金公式自由组合
 - **人物一致性**：insightface 人脸相似度校验，≥0.45 归档 / 0.35–0.45 存疑 / <0.35 判串味进拒图
 - **六面形象**：黛眉 / 冷感职场 / 夜魅 / 飒影 / 慵懒晨光 / 泳池魅影，一套锚点锁死一张脸
-- **完整闭环脚本**：`candidates`（出候选）→ `pick`（锁基准）→ `derive`（图生图+校验），产物自动归档
+- **完整闭环脚本**：`candidates`（出候选）→ `pick`（锁基准）→ `derive`（图生图+校验）→ 视频（可选），产物自动归档
+- **出视频是可选加工**：`montage` 图集→动态视频（零成本）＋ `video` 首帧→Seedance 图生视频（可选增强）——**图是主产品，视频不强迫**
 - **可分享**：整包复制到任何工作区即用，不依赖包外任何内容，产物自动落在对方工作区
 - **每张图必带负面词**：露而不艳、媚而不俗，低俗 / 风尘 / 过度暴露硬禁
 
@@ -99,14 +100,27 @@ SisterIP/
 │   │   ├── 文案.md                          # 配图文案（不入图）
 │   │   └── 产物.md                          # 产物结构与分享
 │   └── scripts/
-│       ├── generate.py                      # 主脚本（candidates/pick/derive/status）
-│       ├── config.py / generator.py / validator.py
-│       └── requirements.txt                 # 依赖（numpy/opencv/insightface…）
-└── qianmian-yujie-render/                   # 出图产物（作品，自动归档）
+│       ├── generate.py                      # 入口（薄壳，转发到 cli.main()）
+│       ├── cli.py                           # CLI 装配：子命令注册表 + argparse + 统一错误处理
+│       ├── config.py                        # 统一配置（图片/视频/合成，env 可覆盖）
+│       ├── archive.py                       # 产物桶 + 命名 + 写入（单点维护）
+│       ├── pipeline.py                      # 共享编排：成本/校验档位/竖版首帧准备
+│       ├── engine/                          # 生成引擎
+│       │   ├── seedream.py                  #   图片：Seedream（含 Data URI 引用）
+│       │   ├── seedance.py                  #   视频：Seedance（异步提交→轮询→下载）
+│       │   └── errors.py                    #   共用错误分类
+│       ├── commands/                        # 子命令（每模块一个 register）
+│       │   ├── image.py                     #   candidates / pick / derive / status
+│       │   ├── montage.py                   #   图集 → 9:16 动态视频（零成本）
+│       │   └── video.py                     #   Seedance 图生视频（可选增强）
+│       ├── validator.py                     # 人不变校验 + 视频抽帧
+│       └── requirements.txt                 # 依赖（requests/numpy/opencv/insightface…）
+└── qianmian-yujie-render/                   # 出图/出视频产物（作品，自动归档）
     ├── 定妆照/A-黛眉/                        # 已确认基准图
     ├── 候选/                                 # 选型候选批次
     ├── 栏目图/                               # 换装 / 栏目衍生
     ├── 三视图/                               # 三视图衍生
+    ├── 视频/                                 # 视频产物（montage 合成 / video 图生视频）
     ├── 拒图/                                 # 未过人不变校验
     └── 作品集/                               # 成品精选
 ```
@@ -134,8 +148,11 @@ cp scripts/.env.example scripts/.env   # 然后编辑 .env 填 ARK_API_KEY
 | `ARK_API_KEY` | **必填**，火山方舟密钥 | — |
 | `ARK_MODEL` | 出图模型 | `doubao-seedream-5-0-lite-260128` |
 | `ARK_BASE_URL` | API 地址 | `https://ark.cn-beijing.volces.com/api/v3/images/generations` |
+| `ARK_VIDEO_MODEL` | 视频模型（Seedance，需在控制台开通） | `doubao-seedance-2-0-260128` |
+| `ARK_VIDEO_RATIO` / `ARK_VIDEO_RESOLUTION` | 视频比例 / 分辨率 | `9:16` / `720p` |
+| `ARK_FIRSTFRAME_MODE` | 视频首帧方式 | `derive` |
 | `QYJ_OUTPUT_DIR` | 产物根目录 | `<工作区>/qianmian-yujie-render` |
-| `INSIGHTFACE_ROOT` | 人脸模型目录（含 `models/buffalo_l/`）；留空则自动下载 | 空 |
+| `INSIGHTFACE_ROOT` | 人脸模型目录（含 `models/buffalo_l/`）；脚本会自动探测工作区模型，找不到才自动下载 | 自动探测 |
 
 > `.env` 已在 `.gitignore` 中，**永远不会被提交**。
 
@@ -155,17 +172,41 @@ python scripts/generate.py derive \
   --tag 护士装 --n 2
 ```
 
-**查看已出图清单：**
+**查看已出图/视频清单：**
 ```bash
 python scripts/generate.py status
 ```
 
-### 4. 校验
+### 4. 出视频（可选加工，图是主产品）
+
+> **图是主产品，视频不强迫**。两个栏目类栏目适合动态化，两条路都基于已锁基准图：
+
+**图集 → 动态视频（零成本，纯本地，无需开通任何模型）：**
+```bash
+# 先用 derive 出一组换装图集，再合成 9:16 动态视频（Ken Burns + 淡入淡出）
+python scripts/generate.py derive --base ../../../qianmian-yujie-render/定妆照/A-黛眉/A-黛眉.png \
+  --prompt "<换装提示词>" --tag 换装秀 --n 3
+python scripts/generate.py montage --dir ../../../qianmian-yujie-render/栏目图/换装秀 --tag 换装秀
+```
+
+**首帧 → Seedance 图生视频（可选增强，需先开通视频模型）：**
+```bash
+# 未开通也能 --dry-run 验证前置（首帧准备 + 参数组装）
+python scripts/generate.py video \
+  --base ../../../qianmian-yujie-render/定妆照/A-黛眉/A-黛眉.png \
+  --prompt "慵懒靠着吧台，指尖沿杯沿划过，眼神缓缓上挑，发丝微扬，固定机位" \
+  --tag 深夜爵士 --duration 5 --ratio 9:16 --firstframe crop
+```
+
+> 开通视频模型：火山方舟控制台 → 开通管理 → 视频生成模型（`doubao-seedance-2-0-260128`，未开通可回退 `doubao-seedance-1-0-lite-i2v-250428`）。动作提示词遵循「动小不动大」（配方见 `references/配方库/08-视频层.md`）。
+
+### 5. 校验
 
 | 阶段 | 门槛 |
 |------|------|
 | 选型门 | 正脸清晰 + 五官完整 + 对形象锚点语义一致 + 性感质量门 |
 | 衍生门（人不变） | 人脸相似度 **≥0.45** 归档 ✅ ／ 0.35–0.45 存疑 🟡 ／ **<0.35** 串味进拒图 ❌ |
+| 视频门（抽帧） | 抽 50%/90% 处帧 vs 基准图，阈值同上；首帧=基准图、动小不动大 |
 | 通用媚门 | 真实写真、腿线 + 高跟在画面、挑逗三拍至少命中一拍、露而不艳 |
 
 > 人脸相似度管「脸」，性感质量门管「媚」——**两张都要过**。
@@ -179,6 +220,7 @@ python scripts/generate.py status
 | 定妆照 | A·黛眉 | [A-黛眉.png](qianmian-yujie-render/定妆照/A-黛眉/A-黛眉.png) |
 | 换装·女仆装 | A·黛眉 | [女仆装-01.png](qianmian-yujie-render/栏目图/女仆装/女仆装-01.png) |
 | 换装·护士装 | A·黛眉 | [护士装-01.png](qianmian-yujie-render/栏目图/护士装/护士装-01.png) · [护士装-02.png](qianmian-yujie-render/栏目图/护士装/护士装-02.png) |
+| 合成视频（montage 测试） | A·黛眉 | [护士装试合成-montage.mp4](qianmian-yujie-render/视频/护士装试合成-20260816-012645/护士装试合成-montage.mp4) |
 
 ---
 
@@ -186,10 +228,11 @@ python scripts/generate.py status
 
 1. **锚点块一字不改**——只在选型用；A 的脸不能配 C 的妆（形象串味 = 废图）
 2. **换装不改脸 / 衍生人不变**——衍生永远基于基准图的脸，锚点不重新生成
-3. **无基准图不能直接衍生**——三视图 / 换装 / 封面先走选型定基准
+3. **无基准图不能直接衍生 / 出视频**——三视图 / 换装 / 封面 / `video` / `montage` 先走选型定基准
 4. **负面词必带**——露而不艳、媚而不俗；低俗 / 风尘 / 过度暴露 / 油腻硬禁
 5. **边界守恒**——诱惑档 ≠ 暴露档；皮肤面积可多，画面依然留白、克制、真实摄影感
 6. **文案不入图**——配图文案单独输出，绝不拼进图提示词
+7. **视频动小不动大**——图生视频只写轻微动作（眼神 / 发丝 / 指尖），大幅动作崩脸崩形 = 废片
 
 ---
 
