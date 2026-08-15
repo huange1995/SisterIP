@@ -12,3 +12,11 @@ class RetryableError(GeneratorError):
 
 class FatalError(GeneratorError):
     """不可重试：401 / 404 / 400 / 配额。"""
+
+
+class FFmpegError(GeneratorError):
+    """本地 ffmpeg 加工失败（concat / 混音 / 封装 / 盖字卡）。"""
+
+
+class TTSUnavailableError(GeneratorError):
+    """TTS 未配置或调用失败；compose 捕获后降级为跳过旁白并警告。"""

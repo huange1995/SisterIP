@@ -1,0 +1,23 @@
+{
+  "title": "深夜爵士",
+  "ratio": "9:16",
+  "fps": 24,
+  "scenes": [
+    {"id": "s1", "src": "images", "dir": "栏目图/护士装", "per": 2.5,
+     "cuts": "hard", "cam": "alternate", "text": "夜晚归她管"},
+    {"id": "s2", "src": "image", "base": "定妆照/A-黛眉/A-黛眉.png",
+     "dur": 5, "cam": "zoom-in", "text": "酒杯映着灯"},
+    {"id": "s3", "src": "seedance", "base": "定妆照/A-黛眉/A-黛眉.png",
+     "prompt": "Shot 1: 侧身回眸 发丝微扬 / Shot 2: 指尖划过杯沿 眼神上挑",
+     "dur": -1, "firstframe": "derive",
+     "ff_prompt": "9:16 竖版写真，御姐气质，暗调爵士酒吧",
+     "text": "三点后的爵士"}
+  ],
+  "audio": {
+    "bgm": "深夜爵士.mp3",
+    "bgm_volume": 0.4,
+    "voiceover": [
+      {"scene": "s3", "text": "夜晚归她管，酒杯映着眼里的灯。"}
+    ]
+  }
+}

@@ -7,6 +7,8 @@
 - 成功：content.video_url（MP4），24h 内必须下载，过期 403
 - 图生视频建议 --ratio 跟随首帧比例；本技能默认 9:16，首帧已按 9:16 准备
 - 文本参数（拼进 text）：--duration 4-15 --ratio 9:16 --resolution 720p --watermark false
+- 多镜头（2.0）：prompt 里用 "Shot 1: ... / Shot 2: ..."（或【时间轴】0-3s: ...）即可单次生成 2-3 镜
+- 接龙：content 里加 video_url 元素 role=last_frame，用上一段尾帧续接
 """
 
 from __future__ import annotations
@@ -15,31 +17,27 @@ import json
 import time
 from pathlib import Path
 
-import requests
-
 from config import Config
+from engine.ark import ArkClientBase, to_data_uri
 from engine.errors import FatalError, GeneratorError, RetryableError
-from engine.seedream import to_data_uri
 
 
-class SeedanceClient:
+class SeedanceClient(ArkClientBase):
     def __init__(self, cfg: Config):
-        self.cfg = cfg
-        if not cfg.api_key:
-            raise GeneratorError(
-                "未设置 ARK_API_KEY：把 scripts/.env.example 复制为 scripts/.env 并填入你的火山方舟密钥"
-            )
-        self.session = requests.Session()
-        self.headers = {
-            "Authorization": f"Bearer {cfg.api_key}",
-            "Content-Type": "application/json",
-        }
+        super().__init__(cfg, service_name="视频")
 
     # ------------------------------------------------------------ 提交任务
     def create_task(self, prompt: str, first_frame: Path, model: str,
                     duration: int, ratio: str, resolution: str,
-                    watermark: bool = False) -> dict:
-        """提交图生视频任务，返回 {"id": task_id}。"""
+                    watermark: bool = False, *,
+                    last_frame: Path | None = None,
+                    json_extra: dict | None = None) -> dict:
+        """提交图生视频任务，返回 {"id": task_id}。
+
+        duration 传 -1 表示 auto（让模型按内容自定时长，多镜头常用）。
+        last_frame：可选接龙尾帧（上一段视频的最后一帧图），续接下一镜头。
+        json_extra：可选透传的顶层字段（如 {"generate_audio": True}），扩展用。
+        """
         params = f" --duration {duration} --ratio {ratio} --resolution {resolution}"
         if not watermark:
             params += " --watermark false"
@@ -49,25 +47,31 @@ class SeedanceClient:
             img = {"url": first_url}
             if use_role:
                 img["role"] = "first_frame"
-            return {
-                "model": model,
-                "content": [
-                    {"type": "text", "text": prompt + params},
-                    {"type": "image_url", "image_url": img},
-                ],
-            }
+            content = [
+                {"type": "text", "text": prompt + params},
+                {"type": "image_url", "image_url": img},
+            ]
+            if last_frame is not None:
+                content.append({
+                    "type": "video_url",
+                    "video_url": {"url": to_data_uri(last_frame), "role": "last_frame"},
+                })
+            payload = {"model": model, "content": content}
+            if json_extra:
+                payload.update(json_extra)
+            return payload
 
         # 2.0 用 role=first_frame；若该模型不认 role，400 报错会带 role → 去掉重试一次
         last: GeneratorError | None = None
         for use_role in (True, False):
-            resp = self._post(_build(use_role))
+            resp = self._post(self.cfg.video_api_base, _build(use_role))
             if resp.status_code == 200:
                 data = resp.json()
                 task_id = data.get("id")
                 if not task_id:
                     raise FatalError(f"响应无 task id: {resp.text[:300]}")
                 return {"id": task_id, "raw": data}
-            err = self._classify(resp)
+            err = self._classify(resp, model_kind="视频模型")
             if resp.status_code == 400 and "role" in resp.text:
                 last = err
                 continue
@@ -84,12 +88,9 @@ class SeedanceClient:
         url = f"{cfg.video_api_base.rstrip('/')}/{task_id}"
         start = time.monotonic()
         while True:
-            try:
-                resp = self.session.get(url, headers=self.headers, timeout=cfg.timeout)
-            except requests.RequestException as e:
-                raise RetryableError(f"轮询网络错误: {e}")
+            resp = self._get(url)
             if resp.status_code != 200:
-                raise self._classify(resp)
+                raise self._classify(resp, model_kind="视频模型")
             data = resp.json()
             status = data.get("status", "unknown")
             if status == "succeeded":
@@ -123,36 +124,10 @@ class SeedanceClient:
 
     def download_video(self, video_url: str, dest: Path) -> None:
         """下载 MP4 到 dest。URL 24h 后过期。"""
-        try:
-            resp = self.session.get(video_url, timeout=self.cfg.video_download_timeout)
-        except requests.RequestException as e:
-            raise RetryableError(f"下载视频网络错误: {e}")
+        resp = self.session.get(video_url, timeout=self.cfg.video_download_timeout)
         if resp.status_code != 200:
             raise GeneratorError(
                 f"下载视频失败 HTTP {resp.status_code}（URL 24h 后过期，请尽早下载）"
             )
         Path(dest).parent.mkdir(parents=True, exist_ok=True)
         Path(dest).write_bytes(resp.content)
-
-    # ------------------------------------------------------------ 内部
-    def _post(self, payload: dict) -> requests.Response:
-        try:
-            return self.session.post(self.cfg.video_api_base, json=payload,
-                                     headers=self.headers, timeout=self.cfg.timeout)
-        except requests.RequestException as e:
-            raise RetryableError(f"提交视频任务网络错误: {e}")
-
-    def _classify(self, resp) -> GeneratorError:
-        body = resp.text[:300]
-        code = resp.status_code
-        if code == 429:
-            return RetryableError(f"429 限流: {body}")
-        if code == 401:
-            return FatalError(f"401 认证失败，检查 ARK_API_KEY: {body}")
-        if code == 404:
-            return FatalError(f"404 端点/模型不存在，检查视频模型是否已开通: {body}")
-        if code == 400:
-            return FatalError(f"400 请求参数错误: {body}")
-        if 500 <= code < 600:
-            return RetryableError(f"{code} 服务端错误: {body}")
-        return FatalError(f"{code} 未知错误: {body}")

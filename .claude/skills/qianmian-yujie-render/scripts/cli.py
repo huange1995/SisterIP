@@ -1,21 +1,38 @@
 # -*- coding: utf-8 -*-
-"""CLI 装配与分发：子命令注册表 + argparse + 统一错误处理。
+"""CLI 装配与分发：子命令自动发现 + argparse + 统一错误处理。
 
 新增子命令：在 scripts/commands/ 下加模块（实现 cmd_* + register），
-并在下方 import 列表登记即可，不改本文件其它部分。
+pkgutil 自动发现并注册，不用改本文件。
 """
 
 from __future__ import annotations
 
 import argparse
+import importlib
+import pkgutil
 import sys
 from pathlib import Path
 
+import commands as commands_pkg
 from config import load_config
 from engine.errors import GeneratorError
 
 # 技能根：.claude/skills/qianmian-yujie-render/
 SKILL_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _discover_commands() -> list:
+    """自动收集 commands/ 下所有带 register() 的模块（含 compose 等新命令）。"""
+    mods = []
+    for m in sorted(pkgutil.iter_modules(commands_pkg.__path__), key=lambda m: m.name):
+        try:
+            mod = importlib.import_module(f"commands.{m.name}")
+        except Exception as e:
+            print(f"⚠  跳过命令模块 commands/{m.name}.py: {e}")
+            continue
+        if hasattr(mod, "register"):
+            mods.append(mod)
+    return mods
 
 
 def _setup_utf8_console() -> None:
@@ -47,9 +64,8 @@ def main() -> int:
     )
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    # 子命令注册：commands/ 每模块一个 register(sub)
-    from commands import image, montage, video
-    for mod in (image, montage, video):
+    # 子命令自动发现：commands/ 每模块一个 register(sub)
+    for mod in _discover_commands():
         mod.register(sub)
 
     args = parser.parse_args()

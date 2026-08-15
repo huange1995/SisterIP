@@ -8,12 +8,8 @@ from pathlib import Path
 
 import archive
 from engine.seedream import SeedreamGenerator
-from pipeline import cost_image, seeds, verdict_label
+from pipeline import cost_image, is_image, seeds, verdict_label
 from validator import FaceValidator
-
-
-def _is_image(path: Path) -> bool:
-    return path.suffix.lower() in (".png", ".jpg", ".jpeg", ".webp")
 
 
 # ---------------------------------------------------------------- 选型：出候选
@@ -34,7 +30,7 @@ def cmd_candidates(args, cfg) -> int:
     if args.dry_run:
         print(f"  [dry-run] 不调用 API。将写入: {run_dir}")
         for i, s in enumerate(seeds_list, 1):
-            print(f"    candidate-{i:02d}.png  seed={s}")
+            print(f"    {archive.candidate_name(i)}  seed={s}")
         print(f"  提示词预览:\n{prompt}")
         return 0
 
@@ -43,7 +39,7 @@ def cmd_candidates(args, cfg) -> int:
     for i, s in enumerate(seeds_list, 1):
         print(f"  生成第 {i}/{n} 张 (seed={s}) …", flush=True)
         img = gen.generate_one(prompt, seed=s)
-        fname = f"candidate-{i:02d}.png"
+        fname = archive.candidate_name(i)
         archive.write(run_dir / fname, img)
         files.append({"file": fname, "seed": s})
         print(f"    ✅ {run_dir / fname}")
@@ -85,7 +81,7 @@ def cmd_pick(args, cfg) -> int:
                 print(f"  {p.name}")
         return 2
 
-    if not _is_image(target):
+    if not is_image(target):
         print(f"错误：不是图片文件: {target.suffix}")
         return 2
 
@@ -122,14 +118,6 @@ def cmd_derive(args, cfg) -> int:
     pass_t = cfg.threshold_pass
     warn_t = cfg.threshold_warn
 
-    # 校验器（best-effort：没装 insightface / 缺模型 → 跳过并明确警告）
-    validator = None
-    if not args.no_validate:
-        try:
-            validator = FaceValidator(cfg)
-        except Exception as e:
-            print(f"⚠  未加载人脸校验器，跳过「人不变」校验: {e}")
-
     print(f"[derive] 以基准图「{base.name}」图生图 · {kind} · {n} 张 · tag={tag}")
     print(f"  {cost_image(cfg, n)}")
     print(f"  model={cfg.model}  size={cfg.size}  reference=基准图(Data URI)")
@@ -140,12 +128,21 @@ def cmd_derive(args, cfg) -> int:
         print(f"  衍生提示词预览:\n{prompt}")
         return 0
 
+    # 校验器（best-effort：没装 insightface / 缺模型 → 跳过并明确警告）
+    # 放在 dry-run 之后：dry-run 零依赖、不加载人脸模型
+    validator = None
+    if not args.no_validate:
+        try:
+            validator = FaceValidator(cfg)
+        except Exception as e:
+            print(f"⚠  未加载人脸校验器，跳过「人不变」校验: {e}")
+
     gen = SeedreamGenerator(cfg)
     results = []
     for i, s in enumerate(seeds_list, 1):
         print(f"  生成第 {i}/{n} 张 (seed={s}) …", flush=True)
         img = gen.generate_one(prompt, reference=base, seed=s)
-        fname = f"{tag}-{i:02d}.png"
+        fname = archive.derive_name(tag, i)
 
         # 先落盘才能对图做校验
         archive.write(out_dir / fname, img)
@@ -179,6 +176,7 @@ def cmd_derive(args, cfg) -> int:
             "file": fname,
             "seed": s,
             "label": label,
+            "action": action,
             "score": round(score, 4) if score is not None else None,
         })
 
@@ -198,9 +196,10 @@ def cmd_derive(args, cfg) -> int:
         "results": results,
     })
 
-    kept = [r for r in results if r["label"].startswith(("通过", "存疑", "未校验", "校验出错"))]
+    # 用 action 字段统计（旧版用 label 中文前缀判断，文案一改就错）
+    kept = [r for r in results if r.get("action", "keep") == "keep"]
     print(f"\n完成：通过/存疑 {len(kept)} 张 → {out_dir}")
-    rej = [r for r in results if r["label"].startswith(("串味", "无脸"))]
+    rej = [r for r in results if r.get("action", "keep") in ("reject", "quarantine")]
     if rej:
         print(f"      串味/无脸 {len(rej)} 张 → {rej_dir}（人不变是硬前提，请人工复核）")
     print("下一步：按 references/校验.md 核对「脸 + 媚 + 封面三要素」后归档。")

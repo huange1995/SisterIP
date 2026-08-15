@@ -31,16 +31,17 @@ def cmd_video(args, cfg) -> int:
         return 2
 
     tag = args.tag or "video"
-    duration = args.duration or cfg.video_duration
+    duration = args.duration if args.duration is not None else cfg.video_duration
     ratio = args.ratio or cfg.video_ratio
     resolution = args.resolution or cfg.video_resolution
     model = args.model or cfg.video_model
     mode = args.firstframe or cfg.firstframe_mode
     run_dir = archive.bucket(cfg, "视频", f"{tag}-{archive.stamp()}")
 
+    api_duration = duration if duration > 0 else -1  # -1 → auto（多镜头 2.0 自定时长）
     print(f"[video] Seedance 图生视频 · {tag}")
-    print(f"  {cost_video(cfg, duration)}")
-    print(f"  model={model}  {ratio} {resolution} {duration}s  首帧={mode}")
+    print(f"  {cost_video(cfg, duration if duration > 0 else cfg.video_duration)}")
+    print(f"  model={model}  {ratio} {resolution} {duration}s{' (auto 多镜头)' if duration <= 0 else ''}  首帧={mode}")
     if mode == "derive" and not args.ff_prompt and not args.dry_run:
         print("错误：--firstframe derive 需要 --ff-prompt（竖版写真图片提示词，非动作提示词）")
         return 2
@@ -66,7 +67,7 @@ def cmd_video(args, cfg) -> int:
     client = SeedanceClient(cfg)
     print("  ① 提交视频任务 …", flush=True)
     task = client.create_task(prompt=prompt, first_frame=ff, model=model,
-                              duration=duration, ratio=ratio,
+                              duration=api_duration, ratio=ratio,
                               resolution=resolution, watermark=cfg.video_watermark)
     task_id = task["id"]
     print(f"    task_id={task_id}，轮询中（每 {cfg.video_poll_interval}s）…", flush=True)
@@ -135,7 +136,7 @@ def cmd_video(args, cfg) -> int:
             "created": archive.stamp(),
         })
         print(f"✅ 完成：{mp4}（首帧/校验图/清单在同一目录）")
-        print("  配乐/字幕建议到剪映等工具叠加（脚本不处理音频）。")
+        print("  想要多镜头/配乐/旁白/字幕成片 → 用 compose 镜头脚本一键成片。")
     return 0
 
 
@@ -143,9 +144,10 @@ def register(sub) -> None:
     p = sub.add_parser("video", help="视频：Seedance 图生视频（基准图当首帧，人不变；可选增强）")
     p.add_argument("--base", required=True, help="基准图路径（定妆照）")
     p.add_argument("--prompt", required=True,
-                   help="动作描述（动小不动大，如：轻抬眼帘，指尖拂过发丝，回眸）")
+                   help="动作描述（动小不动大；多镜头 2.0 可写 Shot 1: … / Shot 2: … 一次出 2-3 镜）")
     p.add_argument("--tag", default=None, help="产物 tag，如 深夜爵士")
-    p.add_argument("--duration", type=int, default=None, help="时长秒数 4–15（默认 5）")
+    p.add_argument("--duration", type=int, default=None,
+                   help="时长秒数 4–15（默认 5；0 或负数 = auto，多镜头 2.0 自定时长）")
     p.add_argument("--ratio", default=None, help="比例 9:16 / 16:9 / 1:1（默认 9:16）")
     p.add_argument("--resolution", default=None, help="分辨率 720p（默认）")
     p.add_argument("--model", default=None, help="视频模型 ID（默认取 config / 环境）")

@@ -3,7 +3,7 @@
 
 已核实的接口事实（2026-08，火山方舟 ark.cn-beijing.volces.com）：
 - 端点 POST {base_url}，Authorization: Bearer {KEY}，OpenAI Images 兼容
-- 参考图本地文件必须转 Data URI：data:image/png;base64,...（格式须小写）
+- 参考图本地文件必须转 Data URI（见 engine/ark.to_data_uri）
 - 官方无 negative_prompt 字段 → 负面约束已在提示词里拼进文本（SKILL.md 组装阶段完成）
 - seed 为遗留参数，新版模型会忽略；此处仅用于跟踪 / 换种重试
 - size 支持显式像素（如 2048x2048 / 1440x2560 竖版）；1K（约 1024x1024）会被 400 拒
@@ -12,33 +12,16 @@
 from __future__ import annotations
 
 import base64
-import mimetypes
-import os
-import random
-import time
 from pathlib import Path
 
 from config import Config
-from engine.errors import FatalError, GeneratorError, RetryableError
+from engine.ark import ArkClientBase
+from engine.errors import FatalError, RetryableError
 
 
-def to_data_uri(path: Path) -> str:
-    """本地图片 → data:image/xxx;base64,...（火山方舟用 Data URI 引用参考图）。"""
-    p = Path(path)
-    raw = p.read_bytes()
-    if len(raw) > 30 * 1024 * 1024:
-        raise GeneratorError(f"参考图超过 30MB: {p}")
-    mime = mimetypes.guess_type(p.name)[0] or "image/png"
-    return f"data:{mime};base64," + base64.b64encode(raw).decode()
-
-
-class SeedreamGenerator:
+class SeedreamGenerator(ArkClientBase):
     def __init__(self, cfg: Config):
-        self.cfg = cfg
-        if not cfg.api_key:
-            raise GeneratorError(
-                "未设置 ARK_API_KEY：把 scripts/.env.example 复制为 scripts/.env 并填入你的火山方舟密钥"
-            )
+        super().__init__(cfg, service_name="图片")
 
     def generate_one(self, prompt: str, reference: Path | None = None,
                      seed: int | None = None, size: str | None = None) -> bytes:
@@ -46,9 +29,6 @@ class SeedreamGenerator:
 
         reference 为基准图路径（图生图）；size 覆盖默认尺寸（如竖版首帧 1440x2560）。
         """
-        # 延迟导入：没装 requests 时也能 import 本模块（dry-run / status 可用）
-        import requests
-
         payload = {
             "model": self.cfg.model,
             "prompt": prompt,
@@ -60,41 +40,26 @@ class SeedreamGenerator:
         if seed is not None:
             payload["seed"] = int(seed)
         if reference is not None:
+            from engine.ark import to_data_uri
             payload["image"] = to_data_uri(reference)
 
-        headers = {
-            "Authorization": f"Bearer {self.cfg.api_key}",
-            "Content-Type": "application/json",
-        }
-
-        last: GeneratorError | None = None
-        session = requests.Session()
+        last: RetryableError | None = None
+        resp = None
         for attempt in range(self.cfg.max_retries + 1):
             try:
-                resp = session.post(
-                    self.cfg.base_url, json=payload, headers=headers,
-                    timeout=self.cfg.timeout,
-                )
-            except requests.RequestException as e:
-                last = RetryableError(f"网络错误: {e}")
+                resp = self._post(self.cfg.base_url, payload)
+            except RetryableError as e:
+                last = e
             else:
                 if resp.status_code == 200:
                     return self._parse_b64(resp)
-                last = self._classify(resp)
-                if isinstance(last, FatalError):
-                    raise last
-
-            if attempt < self.cfg.max_retries:
-                retry_after = None
-                if "resp" in locals() and resp.status_code == 429:
-                    ra = resp.headers.get("Retry-After")
-                    if ra and ra.isdigit():
-                        retry_after = float(ra)
-                self._sleep(attempt, retry_after)
-                continue
-            raise last  # type: ignore[misc]
-
-        raise last  # 不可达，防御
+                err = self._classify(resp, model_kind="ARK_MODEL")
+                if isinstance(err, FatalError):
+                    raise err
+                last = err  # type: ignore[assignment]
+            if not self._retry_after(resp, attempt):
+                break
+        raise last or FatalError("图片生成失败（内部错误）")
 
     # ------------------------------------------------------------ 内部
     def _parse_b64(self, resp) -> bytes:
@@ -104,27 +69,3 @@ class SeedreamGenerator:
         except (ValueError, KeyError, IndexError, TypeError):
             raise FatalError(f"响应缺少 b64_json，响应原文: {resp.text[:300]}")
         return base64.b64decode(b64)
-
-    def _classify(self, resp) -> GeneratorError:
-        body = resp.text[:300]
-        code = resp.status_code
-        if code == 429:
-            return RetryableError(f"429 限流: {body}")
-        if code == 401:
-            return FatalError(f"401 认证失败，检查 ARK_API_KEY: {body}")
-        if code == 404:
-            return FatalError(
-                f"404 端点/模型不存在，检查 ARK_MODEL 是否已开通: {body}"
-            )
-        if code == 400:
-            return FatalError(f"400 请求参数错误: {body}")
-        if 500 <= code < 600:
-            return RetryableError(f"{code} 服务端错误: {body}")
-        return FatalError(f"{code} 未知错误: {body}")
-
-    def _sleep(self, attempt: int, fixed: float | None = None) -> None:
-        if fixed is not None:
-            time.sleep(min(fixed, 60.0))
-        else:
-            base = self.cfg.retry_backoff * (2 ** attempt)
-            time.sleep(min(base + random.uniform(0, 1.0), 60.0))

@@ -6,6 +6,10 @@
 requests>=2.31
 python-dotenv>=1.0
 
+# 本地媒体加工（成片 compose：ffmpeg 二进制 + 字幕字卡）
+imageio-ffmpeg>=0.5
+Pillow>=10.0
+
 # 人不变人脸校验（insightface 0.7.3 基于 numpy 1.x ABI，numpy 版本已锁）
 numpy==1.26.4
 opencv-python>=4.9

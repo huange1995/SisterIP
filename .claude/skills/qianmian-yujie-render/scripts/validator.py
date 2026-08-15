@@ -83,10 +83,10 @@ class FaceValidator:
     def embedding(self, img_bytes: bytes) -> np.ndarray | None:
         """返回 normed 人脸嵌入；无脸 / 坏图返回 None。线程安全。"""
         with self._lock:
-            import cv2
-
-            img = cv2.imdecode(np.frombuffer(img_bytes, np.uint8), cv2.IMREAD_COLOR)
-            if img is None:
+            try:
+                from pipeline import decode_image
+                img = decode_image(img_bytes)
+            except ValueError:
                 return None
             faces = self.app.get(img)
             if not faces:
@@ -112,10 +112,11 @@ class FaceValidator:
     def extract_frame(self, video_path: Path, frac: float, out_path: Path) -> Path | None:
         """按播放进度 frac(0~1) 抽一帧存到 out_path（视频「人不变」用）。
 
-        cv2.imwrite 对中文路径会失败，故用 imencode + numpy.tofile 落盘。
+        用 pipeline.imwrite_safe 落盘（imencode + tofile，中文路径安全）。
         成功返回 out_path，失败返回 None。
         """
         import cv2
+        from pipeline import imwrite_safe
 
         cap = cv2.VideoCapture(str(video_path))
         if not cap.isOpened():
@@ -127,11 +128,7 @@ class FaceValidator:
             ok, frame = cap.read()
             if not ok:
                 return None
-            ok2, buf = cv2.imencode(".png", frame)
-            if not ok2:
-                return None
-            Path(out_path).parent.mkdir(parents=True, exist_ok=True)
-            buf.tofile(str(out_path))
+            imwrite_safe(Path(out_path), frame, ext=".png")
             return Path(out_path)
         finally:
             cap.release()
