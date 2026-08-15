@@ -1,0 +1,20 @@
+# ---------- 密钥 / 本地配置 ----------
+# 火山方舟 API 密钥（唯一真实密钥，严禁入库）
+.claude/skills/qianmian-yujie-render/scripts/.env
+**/.env
+*.local.json
+.claude/settings.local.json
+
+# ---------- 虚拟环境 / 依赖 ----------
+.claude/skills/qianmian-yujie-render/.venv/
+**/__pycache__/
+*.pyc
+
+# ---------- 模型权重（本地下载，不入库） ----------
+models/
+
+# ---------- 系统 / 编辑器 ----------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

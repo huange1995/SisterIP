@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Edit(/.claude/skills/qianmian-yujie-render/**)"
+    ]
+  }
+}

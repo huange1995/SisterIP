@@ -1,0 +1,16 @@
+# qianmian-yujie-render 出图脚本依赖（自包含，可共享）
+# 安装：cd .claude/skills/qianmian-yujie-render && uv venv && uv pip install -r scripts/requirements.txt
+# 注：generate.py 的 dry-run / status 只需要 requests；人不变校验才需要 numpy/opencv/insightface。
+
+# 核心
+requests>=2.31
+python-dotenv>=1.0
+
+# 人不变人脸校验（insightface 0.7.3 基于 numpy 1.x ABI，numpy 版本已锁）
+numpy==1.26.4
+opencv-python>=4.9
+# insightface 导入会走 scipy.io；scipy>=1.13 要求 numpy>=2.0，必须锁 <1.13
+scipy<1.13
+insightface==0.7.3
+# CPU 兜底（单张嵌入 <1s 够用）；有 CUDA12 驱动可换 onnxruntime-gpu==1.18.0
+onnxruntime>=1.18
