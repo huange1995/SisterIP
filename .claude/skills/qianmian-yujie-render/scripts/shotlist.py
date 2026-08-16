@@ -91,6 +91,7 @@ def parse(data: dict) -> dict:
             "bgm_volume": audio.get("bgm_volume"),
             "voiceover": voiceover,
         },
+        "grade": data.get("grade"),          # 渲染期统一调色（策划层 coherence.grade 透传）
     }
 
 

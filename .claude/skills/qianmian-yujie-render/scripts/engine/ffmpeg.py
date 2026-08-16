@@ -104,6 +104,54 @@ def concat_clips(clips: list[Path], out: Path, *, size: str, fps: int) -> Path:
     return out
 
 
+def apply_grade(video: Path, out: Path, grade: dict) -> Path:
+    """给视频套统一调色：eq（亮度/对比度/饱和度）+ colorbalance（冷暖）。
+
+    grade = {"brightness": 0, "contrast": 1.05, "saturation": 0.9, "warmth": 1.0}
+    - brightness：eq 的 brightness，0 = 不变（范围约 -1~1）
+    - contrast / saturation：eq 的对比度/饱和度，1 = 不变
+    - warmth：冷暖因子，1.0 = 不变，>1 偏暖（红），<1 偏冷（蓝）→ 映射成 colorbalance 的
+      rs/ms/hs 红移与 bs/bm/bh 蓝移（范围 -1~1，同量反向）
+    全默认（0 / 1 / 1 / 1）→ 原样返回，不重编码（零成本零损耗）。
+    """
+    b = float(grade.get("brightness", 0) or 0)
+    c = float(grade.get("contrast", 1) or 1)
+    s = float(grade.get("saturation", 1) or 1)
+    w = float(grade.get("warmth", 1) or 1)
+    shift = max(-1.0, min(1.0, w - 1.0))
+    if abs(b) < 1e-9 and abs(c - 1.0) < 1e-9 and abs(s - 1.0) < 1e-9 and abs(shift) < 1e-9:
+        return Path(video)
+    eq = f"eq=brightness={b:.4g}:contrast={c:.4g}:saturation={s:.4g}"
+    # ffmpeg 7.x 选项：rs/rm/rh=红 阴影/中调/高光，bs/bm/bh=蓝（同量反向=暖/冷）
+    cb = ("colorbalance=rs={r:.4g}:rm={r:.4g}:rh={r:.4g}:bs={q:.4g}:bm={q:.4g}:bh={q:.4g}"
+          .format(r=shift, q=-shift))
+    run([
+        "-i", str(video),
+        "-filter_complex", f"[0:v]{eq},{cb}[v]",
+        "-map", "[v]", "-map", "0:a?",
+        "-c:v", "libx264", "-preset", "medium", "-crf", "18",
+        "-pix_fmt", "yuv420p", "-c:a", "copy", "-y", str(out),
+    ])
+    return out
+
+
+def last_frame(video: Path, out: Path, *, size: str) -> Path:
+    """抽视频末帧并缩放到目标画幅（跨镜末帧接龙：上一镜末帧 → 下一镜首帧参考）。
+
+    -sseof 从结尾回退 0.1s 取帧，避免最后一帧 PTS/截断边界问题；
+    scale+pad 保 9:16 比例（与 montage/seedance 画幅一致，仅缩放）。
+    """
+    w, h = _parse_size(size)
+    fc = (f"[0:v]scale={w}:{h}:force_original_aspect_ratio=decrease,"
+          f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2,setsar=1[v0]")
+    run([
+        "-sseof", "-0.1", "-i", str(video),
+        "-filter_complex", fc,
+        "-map", "[v0]", "-frames:v", "1", "-y", str(out),
+    ])
+    return out
+
+
 def mix_tracks(tracks: list[dict], out: Path, *, normalize: bool = False) -> Path:
     """把多路音频轨按序混合为 .m4a（AAC 192k）。
 

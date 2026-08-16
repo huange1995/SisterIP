@@ -85,13 +85,28 @@ def _render_local_clip(cfg: Config, sc: dict, out_dir: Path, *,
 
 
 def _render_seedance_clip(cfg: Config, sc: dict, out_dir: Path, *,
-                          size: tuple[int, int], fps: int) -> Path:
-    """seedance 源：图生视频 → 下载 → 盖字卡。返回 clip 路径。"""
+                          size: tuple[int, int], fps: int,
+                          prev_clips: dict[str, Path] | None = None) -> Path:
+    """seedance 源：图生视频 → 下载 → 盖字卡。返回 clip 路径。
+
+    continue_from：跨镜末帧接龙——抽上一镜 clip 末帧作首帧参考（脸/姿态延续），
+    代替默认的「基准图 derive/crop 首帧」。
+    """
     base = _resolve_path(cfg, sc["base"])
     mode = sc.get("firstframe", "derive")
     gen = SeedreamGenerator(cfg) if mode == "derive" else None
-    ff = prepare_first_frame(cfg, base, mode, out_dir, gen=gen,
-                             ff_prompt=sc.get("ff_prompt"), size=cfg.firstframe_size)
+
+    cf = sc.get("continue_from")
+    if cf:
+        prev = (prev_clips or {}).get(cf)
+        if prev is None:
+            raise GeneratorError(f"scene {sc['id']} 的 continue_from 无前置 clip: {cf}")
+        ff = ffmpeg.last_frame(prev, out_dir / f"{sc['id']}-firstframe.jpg",
+                               size=cfg.firstframe_size)
+        print(f"    首帧(接龙)：抽 scene {cf} 末帧 → {ff.name}", flush=True)
+    else:
+        ff = prepare_first_frame(cfg, base, mode, out_dir, gen=gen,
+                                 ff_prompt=sc.get("ff_prompt"), size=cfg.firstframe_size)
 
     duration = -1 if sc.get("auto") else int(sc["dur"])  # auto → 自定时长
     client = SeedanceClient(cfg)
@@ -207,8 +222,9 @@ def cmd_compose(args, cfg) -> int:
         extra = f"  text={sc.get('text')!r}" if sc.get("text") else ""
         if sc["src"] == "seedance":
             prompt_pre = sc["prompt"].split("Shot")[0].strip()[:28] or "多镜 Seedance"
+            cf = f" 接续{sc['continue_from']}" if sc.get("continue_from") else ""
             print(f"    {p['start']:>5.1f}s–{p['start']+p['dur']:>5.1f}s  {sc['id']} "
-                  f"[seedance] {prompt_pre}…{extra}")
+                  f"[seedance] {prompt_pre}…{cf}{extra}")
         else:
             print(f"    {p['start']:>5.1f}s–{p['start']+p['dur']:>5.1f}s  {sc['id']} "
                   f"[{sc['src']}] {sc.get('dir') or sc.get('base')}{extra}")
@@ -227,6 +243,9 @@ def cmd_compose(args, cfg) -> int:
     else:
         print(f"    （无）")
 
+    if parsed.get("grade"):
+        print(f"\n  连贯：统一调色 grade={parsed['grade']}（全镜拼帧前套同套，消除跨镜色调漂移）")
+
     if args.dry_run:
         print(f"\n  [dry-run] 零 API。产物将归档: {run_dir}")
         return 0
@@ -239,7 +258,8 @@ def cmd_compose(args, cfg) -> int:
         sc = p["scene"]
         try:
             if sc["src"] == "seedance":
-                clips[sc["id"]] = _render_seedance_clip(cfg, sc, clips_dir, size=size, fps=fps)
+                clips[sc["id"]] = _render_seedance_clip(cfg, sc, clips_dir, size=size, fps=fps,
+                                                        prev_clips=clips)
             else:
                 clips[sc["id"]] = _render_local_clip(cfg, sc, clips_dir, size=size, fps=fps)
             print(f"    ✅ scene {sc['id']} → {clips[sc['id']].name}")
@@ -270,10 +290,23 @@ def cmd_compose(args, cfg) -> int:
             print("  建议：换 seedance 提示词（动小不动大）/ 缩时长 / 人工复核。")
             return 1
 
+    # ②.5 统一调色（grade）：每镜 clip 拼帧前套同一套，消除跨镜色调漂移
+    concat_src: dict[str, Path] = {}
+    if parsed.get("grade"):
+        print(f"\n  ② 统一调色（grade={parsed['grade']}）…")
+        for sc in parsed["scenes"]:
+            src = clips[sc["id"]]
+            eff = ffmpeg.apply_grade(src, clips_dir / f"{sc['id']}-graded.mp4", parsed["grade"])
+            concat_src[sc["id"]] = eff
+            if eff != src:
+                print(f"    {sc['id']} → {eff.name}")
+    else:
+        concat_src = clips
+
     # ③ 拼帧 → 静片
     silent = run_dir / f"{title}-silent.mp4"
     print(f"\n  ③ 拼帧 {len(clips)} 个 clip → 成片画幅 …")
-    ffmpeg.concat_clips([clips[sc["id"]] for sc in parsed["scenes"]],
+    ffmpeg.concat_clips([concat_src[sc["id"]] for sc in parsed["scenes"]],
                         silent, size=f"{size[0]}x{size[1]}", fps=fps)
 
     # ④ 音频：旁白轨（TTS）+ BGM → 混音 → 封装
@@ -318,7 +351,10 @@ def cmd_compose(args, cfg) -> int:
         "fps": fps,
         "size": f"{size[0]}x{size[1]}",
         "timing": [{"id": p["scene"]["id"], "src": p["scene"]["src"],
-                    "start": p["start"], "dur": p["dur"]} for p in plan],
+                    "start": p["start"], "dur": p["dur"],
+                    **({"continue_from": p["scene"]["continue_from"]} if p["scene"].get("continue_from") else {}),
+                    } for p in plan],
+        "grade": parsed.get("grade"),
         "audio": {"bgm": str(bgm) if bgm else None, "voiceover": vo_plan},
         "subtitle": [{"start": s, "end": e, "text": t} for s, e, t in cards],
         "frame_checks": checks,
