@@ -16,7 +16,8 @@
 - **六面形象**：黛眉 / 冷感职场 / 夜魅 / 飒影 / 慵懒晨光 / 泳池魅影，一套锚点锁死一张脸
 - **完整闭环脚本**：`candidates`（出候选）→ `pick`（锁基准）→ `derive`（图生图+校验）→ 视频 / 成片（可选），产物自动归档
 - **出视频是可选加工**：`montage` 图集→动态视频（零成本）＋ `video` 首帧→Seedance 图生视频（多镜头）——**图是主产品，视频不强迫**
-- **成片 compose**：一条镜头脚本 = 一条短片——多镜头（图集连帧 / Seedance 原生）+ 音频（BGM 混音 + 火山 TTS 旁白）+ 字幕（字卡烧录 + SRT）+ 成片门
+- **成片 compose**：一条渲染契约 = 一条短片——多镜头（图集连帧 / Seedance 原生）+ 音频（BGM 混音 + 火山 TTS 旁白）+ 字幕（字卡烧录 + SRT）+ 成片门
+- **三层创作骨架**：① **策划**（企划书 JSON：文案/姿势/镜头/连贯/音乐一次设计好，`produce` 纯本地展开）→ ② **导演**（渲染契约：末帧接龙 `continue_from` + 统一调色 `grade`）→ ③ **执行**（compose 出片）——好作品先把原子内容整体策划好，再排镜头执行
 - **可分享**：整包复制到任何工作区即用，不依赖包外任何内容，产物自动落在对方工作区
 - **每张图必带负面词**：露而不艳、媚而不俗，低俗 / 风尘 / 过度暴露硬禁
 
@@ -97,7 +98,8 @@ SisterIP/
 │   │   │   ├── 06-栏目配方.md               # 6 内容栏目一键出
 │   │   │   ├── 07-范本.md                   # E/G 组候选 + 衍生组 few-shot
 │   │   │   ├── 08-视频层.md                 # 单镜头视频配方（montage / video）
-│   │   │   └── 09-成片层.md                 # 成片 compose：镜头脚本 + 多镜头 + 音频 + 字幕
+│   │   │   ├── 09-成片层.md                 # 成片 compose：渲染契约 + 多镜头 + 音频 + 字幕 + 调色
+│   │   │   └── 10-策划层.md                 # 策划层：企划书 schema + 编辑 Checklist + 黄金公式拼装
 │   │   ├── 流程.md                          # 选型→衍生业务流程
 │   │   ├── 校验.md                          # 选型门 / 衍生门 / 视频门 / 成片门 / 通用门
 │   │   ├── 文案.md                          # 配图文案（不入图）
@@ -108,13 +110,14 @@ SisterIP/
 │       ├── config.py                        # 统一配置（图片/视频/音频/字幕/成片，env 可覆盖）
 │       ├── archive.py                       # 产物桶 + 命名 + 写入（单点维护）
 │       ├── pipeline.py                      # 共享编排：成本/校验档位/读图解码/竖版首帧
-│       ├── shotlist.py                      # 导演层：镜头脚本 schema + 校验 + 确定性时序
+│       ├── planning.py                     # 策划层：企划书 schema + 校验 + 黄金公式拼装 + 展开契约
+│       ├── shotlist.py                      # 导演层：渲染契约 schema + 校验 + 确定性时序
 │       ├── engine/                          # 外部能力适配器
 │       │   ├── ark.py                       #   方舟客户端基类（session/重试/退避 去重）
 │       │   ├── seedream.py                  #   图片：Seedream（含 Data URI 引用）
 │       │   ├── seedance.py                  #   视频：Seedance（异步提交→轮询→下载 + 多镜/接龙）
 │       │   ├── tts.py                       #   火山 TTS 旁白（未配凭据降级跳过）
-│       │   ├── ffmpeg.py                    #   ffmpeg 封装（concat/混音/封装/盖字卡，自带二进制）
+│       │   ├── ffmpeg.py                    #   ffmpeg 封装（concat/混音/封装/盖字卡/调色/末帧，自带二进制）
 │       │   └── errors.py                    #   共用错误分类
 │       ├── media/                           # 本地媒体加工（纯本地可测）
 │       │   ├── montage.py                   #   图集→视频帧渲染（多镜头：cuts/cam/烧字）
@@ -124,7 +127,8 @@ SisterIP/
 │       │   ├── image.py                     #   candidates / pick / derive / status
 │       │   ├── montage.py                   #   图集 → 9:16 动态视频（零成本，薄壳→media）
 │       │   ├── video.py                     #   Seedance 图生视频（多镜头，可选增强）
-│       │   └── compose.py                   #   镜头脚本 → 成片（多镜头+音频+字幕+成片门）
+│       │   ├── compose.py                   #   渲染契约 → 成片（多镜头+音频+字幕+成片门+调色+接龙）
+│       │   └── produce.py                   #   企划书 → 预览 / 逐镜prompt / 渲染契约（策划层）
 │       ├── validator.py                     # 人不变校验 + 视频抽帧
 │       └── requirements.txt                 # 依赖（requests/opencv/insightface/imageio-ffmpeg/Pillow…）
 └── qianmian-yujie-render/                   # 出图/出视频产物（作品，自动归档）
@@ -132,7 +136,8 @@ SisterIP/
     ├── 候选/                                 # 选型候选批次
     ├── 栏目图/                               # 换装 / 栏目衍生
     ├── 三视图/                               # 三视图衍生
-    ├── 视频/                                 # 视频产物（montage 合成 / video 图生视频）
+    ├── 视频/                                 # 视频产物（montage 合成 / video 图生视频 / compose 成片）
+    ├── 音乐库/                               # BGM 曲库（4 首原创垫乐 + 真曲升级指引）
     ├── 拒图/                                 # 未过人不变校验
     └── 作品集/                               # 成品精选
 ```
@@ -236,7 +241,17 @@ python scripts/generate.py video \
 python scripts/generate.py compose --script scripts/深夜爵士.json --dry-run   # 零 API 看镜头/成本/音频/字幕
 python scripts/generate.py compose --script scripts/深夜爵士.json              # 真合成
 ```
-产物：`视频/<title>-<时间戳>/` 下 `{title}.mp4`（含音轨）+ `subtitle.srt` + `clips/`。镜头脚本语法见 `references/配方库/09-成片层.md`。
+产物：`视频/<title>-<时间戳>/` 下 `{title}.mp4`（含音轨）+ `subtitle.srt` + `clips/`。渲染契约语法见 `references/配方库/09-成片层.md`。
+
+**企划书 → 成片（策划层，推荐起点）**：先整体策划 文案/姿势/镜头/连贯/音乐，再展开执行：
+```bash
+python scripts/generate.py produce --inventory                         # 盘点形象库资产（服装/定妆照/曲目）
+python scripts/generate.py produce --brief 企划.json --dry-run         # 创意预览（评审）
+python scripts/generate.py produce --brief 企划.json --prompts         # 逐镜完整 prompt（审查）
+python scripts/generate.py produce --brief 企划.json --emit 契约.json   # 展开渲染契约
+python scripts/generate.py compose --script 契约.json                  # 出片（含末帧接龙 + 统一调色）
+```
+企划书 = 创意产物（AI 编辑生成 + 手工可精修），schema 见 `references/配方库/10-策划层.md`；示例见 `scripts/examples/企划-深夜爵士-顾遥.demo.json`。
 
 ### 5. 校验
 
@@ -246,6 +261,7 @@ python scripts/generate.py compose --script scripts/深夜爵士.json           
 | 衍生门（人不变） | 人脸相似度 **≥0.45** 归档 ✅ ／ 0.35–0.45 存疑 🟡 ／ **<0.35** 串味进拒图 ❌ |
 | 视频门（抽帧） | 抽 50%/90% 处帧 vs 基准图，阈值同上；首帧=基准图、动小不动大 |
 | 成片门（compose） | 每个 seedance 镜抽帧人不变（阈值同上）；**任一镜不过 = 整批成片进拒图** |
+| 连贯三件套 | 策划期设计（姿势/场景延续）+ `continue_from` 末帧接龙 + `grade` 统一调色 |
 | 通用媚门 | 真实写真、腿线 + 高跟在画面、挑逗三拍至少命中一拍、露而不艳 |
 
 > 人脸相似度管「脸」，性感质量门管「媚」——**两张都要过**。
@@ -274,6 +290,7 @@ python scripts/generate.py compose --script scripts/深夜爵士.json           
 7. **视频动小不动大**——图生视频只写轻微动作（眼神 / 发丝 / 指尖），大幅动作崩脸崩形 = 废片
 8. **字幕 / 旁白文案合规**——成片字卡与旁白先过「媚而不俗」底线，低俗 / 引导词 / 违禁词不入片
 9. **成片门是硬门**——compose 任一 seedance 镜抽帧人不变不过 = 整条成片不能交付
+10. **连贯三件套**——成片先策划期设计 + `continue_from` 末帧接龙 + `grade` 统一调色；缺一个连贯就打折
 
 ---
 
