@@ -20,7 +20,7 @@ from config import Config
 from pipeline import is_image
 
 INVENTORY_HINT = (
-    "企划书是 JSON 文件，schema 见 references/配方库/10-策划层.md 与 planning.py 文档"
+    "企划书是 JSON 文件，schema 见 references/成片链/10-策划层.md 与 planning.py 文档"
 )
 
 

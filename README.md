@@ -89,18 +89,19 @@ SisterIP/
 ├── .claude/skills/qianmian-yujie-render/   # 技能包（本仓库主体）
 │   ├── SKILL.md                            # 技能说明（agent 执行入口）
 │   ├── references/                         # 配方知识库
-│   │   ├── 配方库/                          # 五层配方 + 栏目配方 + 范本
+│   │   ├── 配方库/                          # 五层配方 + 栏目配方 + 范本（原子内容）
 │   │   │   ├── 01-形象层.md                 # 6 形象锚点（脸）
 │   │   │   ├── 02-服装层.md                 # 服装 / 丝袜 / 高跟 / 配饰
 │   │   │   ├── 03-姿势层.md                 # 姿势积木 + 三档梯度
 │   │   │   ├── 04-场景层.md                 # 场景积木 + 6×6 预置
 │   │   │   ├── 05-质量层.md                 # 质量尾缀 + 负面词 + 边界
 │   │   │   ├── 06-栏目配方.md               # 6 内容栏目一键出
-│   │   │   ├── 07-范本.md                   # E/G 组候选 + 衍生组 few-shot
-│   │   │   ├── 08-视频层.md                 # 单镜头视频配方（montage / video）
-│   │   │   ├── 09-成片层.md                 # 成片 compose：渲染契约 + 多镜头 + 音频 + 字幕 + 调色
-│   │   │   └── 10-策划层.md                 # 策划层：企划书 schema + 编辑 Checklist + 黄金公式拼装
-│   │   ├── 流程.md                          # 选型→衍生业务流程
+│   │   │   └── 07-范本.md                   # E/G 组候选 + 衍生组 few-shot
+│   │   ├── 成片链/                          # 三层骨架（策划→导演→执行）
+│   │   │   ├── 08-视频层.md                 # 素材：单镜头视频配方（montage / video）
+│   │   │   ├── 09-成片层.md                 # 导演+执行：渲染契约 → compose 成片
+│   │   │   └── 10-策划层.md                 # 策划：企划书 schema + 编辑 Checklist + 黄金公式拼装
+│   │   ├── 流程.md                          # 选型→衍生→成片（三层骨架）业务流程
 │   │   ├── 校验.md                          # 选型门 / 衍生门 / 视频门 / 成片门 / 通用门
 │   │   ├── 文案.md                          # 配图文案（不入图）
 │   │   └── 产物.md                          # 产物结构与分享
@@ -220,7 +221,7 @@ python scripts/generate.py video \
   --tag 深夜爵士 --duration 5 --ratio 9:16 --firstframe crop
 ```
 
-> 开通视频模型：火山方舟控制台 → 开通管理 → 视频生成模型（`doubao-seedance-2-0-260128`，未开通可回退 `doubao-seedance-1-0-lite-i2v-250428`）。动作提示词遵循「动小不动大」；多镜头写法 `--duration 0` + 提示词里 `Shot 1: … / Shot 2: …`（配方见 `references/配方库/08-视频层.md`）。
+> 开通视频模型：火山方舟控制台 → 开通管理 → 视频生成模型（`doubao-seedance-2-0-260128`，未开通可回退 `doubao-seedance-1-0-lite-i2v-250428`）。动作提示词遵循「动小不动大」；多镜头写法 `--duration 0` + 提示词里 `Shot 1: … / Shot 2: …`（配方见 `references/成片链/08-视频层.md`）。
 
 **镜头脚本 → 成片（多镜头 + 音频 + 字幕，compose）：**
 ```json
@@ -241,7 +242,7 @@ python scripts/generate.py video \
 python scripts/generate.py compose --script scripts/深夜爵士.json --dry-run   # 零 API 看镜头/成本/音频/字幕
 python scripts/generate.py compose --script scripts/深夜爵士.json              # 真合成
 ```
-产物：`视频/<title>-<时间戳>/` 下 `{title}.mp4`（含音轨）+ `subtitle.srt` + `clips/`。渲染契约语法见 `references/配方库/09-成片层.md`。
+产物：`视频/<title>-<时间戳>/` 下 `{title}.mp4`（含音轨）+ `subtitle.srt` + `clips/`。渲染契约语法见 `references/成片链/09-成片层.md`。
 
 **企划书 → 成片（策划层，推荐起点）**：先整体策划 文案/姿势/镜头/连贯/音乐，再展开执行：
 ```bash
@@ -251,7 +252,7 @@ python scripts/generate.py produce --brief 企划.json --prompts         # 逐�
 python scripts/generate.py produce --brief 企划.json --emit 契约.json   # 展开渲染契约
 python scripts/generate.py compose --script 契约.json                  # 出片（含末帧接龙 + 统一调色）
 ```
-企划书 = 创意产物（AI 编辑生成 + 手工可精修），schema 见 `references/配方库/10-策划层.md`；示例见 `scripts/examples/企划-深夜爵士-顾遥.demo.json`。
+企划书 = 创意产物（AI 编辑生成 + 手工可精修），schema 见 `references/成片链/10-策划层.md`；示例见 `scripts/examples/企划-深夜爵士-顾遥.demo.json`。
 
 ### 5. 校验
 
