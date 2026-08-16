@@ -1,0 +1,44 @@
+{
+  "title": "深夜爵士·顾遥",
+  "ratio": "9:16",
+  "fps": 24,
+  "concept": {
+    "pitch": "今天店里放的是爵士。急什么，天又塌不下来。",
+    "mood": ["慵懒", "克制", "性感"],
+    "audience": "深夜党 / 都市女性",
+    "style_ref": "暗调爵士酒吧，胶片颗粒"
+  },
+  "cast": {
+    "anchor": "A-黛眉",
+    "anchor_prompt": "30岁成熟东方女性，鹅蛋脸，下颌线清晰，细长杏眼眼尾微上扬，眼神含水带媚，深琥珀棕色瞳孔，微挑弯眉，丰满微笑唇微启，涂正红色哑光口红，黑茶色慵懒大波浪长发",
+    "outfits": [
+      {"name": "护士装", "dir": "栏目图/护士装",
+       "prompt": "护士·御姐版：白制服裙+听诊器，肉色薄丝袜，黑色细高跟"},
+      {"name": "女仆装", "dir": "栏目图/女仆装",
+       "prompt": "女仆·御姐版：黑长裙+白围裙+白蕾丝头饰，白色薄丝袜，黑色细高跟"}
+    ],
+    "light": "暖黄侧光，侧逆光勾勒腰线"
+  },
+  "copy": [
+    {"id": "c1", "text": "值夜班，是她的主旋律", "mode": "subtitle", "tone": "冷", "scene": "s1"},
+    {"id": "c2", "text": "急什么，天又塌不下来。", "mode": "voiceover", "tone": "媚", "scene": "s3"}
+  ],
+  "shots": [
+    {"id": "s1", "role": "establish", "src": "images", "outfit": "护士装",
+     "pose": "侧倚窗边，眼神低垂，手搭听诊器", "scene": "深夜爵士酒吧",
+     "quality": "高清特写，皮肤质感细腻", "cam": "pan", "per": 2.5,
+     "cuts": "hard", "copy": "c1"},
+    {"id": "s2", "role": "detail", "src": "image", "base": "定妆照/A-黛眉/A-黛眉.png",
+     "pose": "回眸，发丝微扬", "scene": "深夜爵士酒吧",
+     "quality": "高清特写，皮肤质感细腻", "cam": "zoom-in", "dur": 4},
+    {"id": "s3", "role": "hook", "src": "seedance", "base": "定妆照/A-黛眉/A-黛眉.png",
+     "outfit": "女仆装", "pose": "指尖划过杯沿", "motion": "眼神上挑，发丝微扬",
+     "scene": "深夜爵士酒吧", "quality": "高清特写，皮肤质感细腻，胶片颗粒",
+     "cam": "slow-zoom", "dur": 4, "copy": "c2", "continue_from": "s2"}
+  ],
+  "music": {"bgm": "深夜爵士-垫乐.mp3", "volume": 0.35, "mood": "sultry-night"},
+  "coherence": {
+    "face": "人不变（成片门 ≥0.45，seedance 镜抽帧校验）",
+    "grade": {"brightness": 0, "contrast": 1.05, "saturation": 0.9, "warmth": 1.0}
+  }
+}
