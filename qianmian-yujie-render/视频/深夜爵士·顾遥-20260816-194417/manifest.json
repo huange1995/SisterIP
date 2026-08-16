@@ -1,0 +1,59 @@
+{
+  "phase": "成片 compose",
+  "title": "深夜爵士·顾遥",
+  "script": "D:\\workplace\\cc-work\\SisterIP\\qianmian-yujie-render\\分镜-深夜爵士-local.json",
+  "ratio": "9:16",
+  "fps": 24,
+  "size": "1080x1920",
+  "timing": [
+    {
+      "id": "s1",
+      "src": "images",
+      "start": 0.0,
+      "dur": 5.0
+    },
+    {
+      "id": "s2",
+      "src": "image",
+      "start": 5.0,
+      "dur": 4.0
+    },
+    {
+      "id": "s3",
+      "src": "images",
+      "start": 9.0,
+      "dur": 4.0
+    }
+  ],
+  "grade": {
+    "brightness": 0,
+    "contrast": 1.05,
+    "saturation": 0.9,
+    "warmth": 1.0
+  },
+  "audio": {
+    "bgm": "D:\\workplace\\cc-work\\SisterIP\\qianmian-yujie-render\\音乐库\\深夜爵士-垫乐.mp3",
+    "voiceover": []
+  },
+  "subtitle": [
+    {
+      "start": 0.0,
+      "end": 5.0,
+      "text": "值夜班，是她的主旋律"
+    },
+    {
+      "start": 9.0,
+      "end": 13.0,
+      "text": "急什么，天又塌不下来。"
+    }
+  ],
+  "frame_checks": {},
+  "clips": [
+    "s1.mp4",
+    "s2.mp4",
+    "s3.mp4"
+  ],
+  "final": "深夜爵士·顾遥.mp4",
+  "srt": "subtitle.srt",
+  "created": "20260816-194434"
+}

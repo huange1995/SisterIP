@@ -1,0 +1,42 @@
+{
+  "title": "深夜爵士·顾遥",
+  "ratio": "9:16",
+  "fps": 24,
+  "scenes": [
+    {
+      "id": "s1",
+      "src": "images",
+      "dir": "栏目图/护士装",
+      "per": 2.5,
+      "cuts": "hard",
+      "cam": "pan",
+      "text": "值夜班，是她的主旋律"
+    },
+    {
+      "id": "s2",
+      "src": "image",
+      "base": "定妆照/A-黛眉/A-黛眉.png",
+      "dur": 4,
+      "cam": "zoom-in"
+    },
+    {
+      "id": "s3",
+      "src": "images",
+      "dir": "栏目图/女仆装",
+      "per": 2.0,
+      "cuts": "hard",
+      "cam": "alternate",
+      "text": "急什么，天又塌不下来。"
+    }
+  ],
+  "audio": {
+    "bgm": "深夜爵士-垫乐.mp3",
+    "bgm_volume": 0.35
+  },
+  "grade": {
+    "brightness": 0,
+    "contrast": 1.05,
+    "saturation": 0.9,
+    "warmth": 1.0
+  }
+}

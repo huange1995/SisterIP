@@ -1,0 +1,49 @@
+{
+  "title": "深夜爵士·顾遥",
+  "ratio": "9:16",
+  "fps": 24,
+  "scenes": [
+    {
+      "id": "s1",
+      "src": "images",
+      "dir": "栏目图/护士装",
+      "per": 2.5,
+      "cuts": "hard",
+      "cam": "pan",
+      "text": "值夜班，是她的主旋律"
+    },
+    {
+      "id": "s2",
+      "src": "image",
+      "base": "定妆照/A-黛眉/A-黛眉.png",
+      "dur": 4,
+      "cam": "zoom-in"
+    },
+    {
+      "id": "s3",
+      "src": "seedance",
+      "base": "定妆照/A-黛眉/A-黛眉.png",
+      "prompt": "Shot 1: 指尖划过杯沿，眼神上挑，发丝微扬",
+      "dur": 4,
+      "firstframe": "derive",
+      "ff_prompt": "女仆·御姐版：黑长裙+白围裙+白蕾丝头饰，白色薄丝袜，黑色细高跟，指尖划过杯沿，深夜爵士酒吧，高清特写，皮肤质感细腻，胶片颗粒，暗调爵士酒吧，胶片颗粒，暖黄侧光，侧逆光勾勒腰线；9:16 竖版写真；低质量，模糊，五官变形，多余手指，文字水印",
+      "continue_from": "s2"
+    }
+  ],
+  "audio": {
+    "bgm": "深夜爵士-垫乐.mp3",
+    "bgm_volume": 0.35,
+    "voiceover": [
+      {
+        "scene": "s3",
+        "text": "急什么，天又塌不下来。"
+      }
+    ]
+  },
+  "grade": {
+    "brightness": 0,
+    "contrast": 1.05,
+    "saturation": 0.9,
+    "warmth": 1.0
+  }
+}
