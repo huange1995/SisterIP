@@ -31,7 +31,7 @@ from pipeline import (
 from validator import FaceValidator
 
 COMPOSE_JSON_HINT = (
-    "镜头脚本是 JSON 文件，示例见 references/成片链/09-成片层.md 与 shotlist.py 文档"
+    "分镜表是 JSON 文件，示例见 references/分镜/01-分镜.md 与 shotlist.py 文档"
 )
 
 
