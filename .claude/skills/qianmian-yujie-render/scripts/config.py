@@ -181,7 +181,7 @@ class Config:
     tts_speed_ratio: float = 1.0
     tts_volume_ratio: float = 1.0
     tts_timeout: int = 60
-    bgm_dir: str = ""                      # 背景音乐曲库目录（QYJ_BGM_DIR，可选）
+    bgm_dir: str = str(WORKSPACE_ROOT / "qianmian-yujie-render" / "音乐库")  # 曲库目录（QYJ_BGM_DIR 可覆盖）；丢 mp3 进该目录即被 compose 自动命中
     bgm_volume: float = 0.5                # BGM 默认音量（相对旁白自动压低）
     bgm_fade: float = 1.0                  # BGM 淡入淡出秒数
     voice_volume: float = 1.0              # 旁白音量
